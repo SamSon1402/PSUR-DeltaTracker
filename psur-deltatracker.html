@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSUR-DeltaTracker — Automated PSUR Update Generation | Biolevate</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #ec4899;
+            --primary-glow: rgba(236, 72, 153, 0.4);
+            --secondary: #a855f7;
+            --accent: #f59e0b;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --info: #8b5cf6;
+            --bg-dark: #0a0518;
+            --bg-card: #161028;
+            --bg-elevated: #251a3d;
+            --text-primary: #faf5ff;
+            --text-secondary: #c4b5fd;
+            --text-muted: #8b7ba9;
+            --border: #251a3d;
+            --border-soft: #3b2a5e;
+            --psur-gradient: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%);
+            --diff-add: rgba(16, 185, 129, 0.18);
+            --diff-del: rgba(239, 68, 68, 0.18);
+            --diff-mod: rgba(245, 158, 11, 0.18);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Sora', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image:
+                radial-gradient(ellipse at 0% 0%, rgba(236, 72, 153, 0.10) 0%, transparent 50%),
+                radial-gradient(ellipse at 100% 100%, rgba(168, 85, 247, 0.10) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
+        }
+
+        .header {
+            background: linear-gradient(180deg, rgba(236, 72, 153, 0.06) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-soft);
+            padding: 0.75rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 46px;
+            height: 46px;
+            background: var(--psur-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            position: relative;
+        }
+
+        .logo-icon::after {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: var(--psur-gradient);
+            border-radius: 14px;
+            z-index: -1;
+            opacity: 0.5;
+            filter: blur(8px);
+        }
+
+        .logo-text {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.7rem;
+            font-weight: 400;
+            background: var(--psur-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.3px;
+        }
+
+        .logo-subtitle {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 500;
+        }
+
+        .header-badges {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border-soft);
+            padding: 0.35rem 0.7rem;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .badge.live {
+            background: rgba(236, 72, 153, 0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .badge.live::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: livePulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--primary-glow); }
+            50% { opacity: 0.6; box-shadow: 0 0 0 8px transparent; }
+        }
+
+        .main {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero h1 {
+            font-family: 'Instrument Serif', serif;
+            font-size: 3rem;
+            font-weight: 400;
+            margin-bottom: 0.4rem;
+            background: var(--psur-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1.5px;
+        }
+
+        .hero h1 .italic {
+            font-style: italic;
+        }
+
+        .hero p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 1300px) {
+            .workspace { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-soft);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-soft);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(180deg, rgba(37, 26, 61, 0.6) 0%, transparent 100%);
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-body { padding: 1.25rem; }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .stat-value.primary { color: var(--primary); }
+        .stat-value.secondary { color: var(--secondary); }
+        .stat-value.success { color: var(--success); }
+        .stat-value.warning { color: var(--warning); }
+        .stat-value.danger { color: var(--danger); }
+
+        .stat-label {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0.25rem;
+        }
+
+        /* Diff Viewer */
+        .diff-viewer {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            height: 460px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .diff-pane {
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .diff-pane-header {
+            padding: 0.65rem 1rem;
+            border-bottom: 1px solid var(--border-soft);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+        }
+
+        .diff-pane-title {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .diff-pane-version {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.62rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: var(--bg-elevated);
+            color: var(--text-muted);
+        }
+
+        .diff-pane.previous .diff-pane-version {
+            background: rgba(239, 68, 68, 0.18);
+            color: #fca5a5;
+        }
+
+        .diff-pane.current .diff-pane-version {
+            background: rgba(16, 185, 129, 0.18);
+            color: #6ee7b7;
+        }
+
+        .diff-content {
+            padding: 1rem 1.25rem;
+            overflow-y: auto;
+            flex: 1;
+            font-size: 0.78rem;
+            line-height: 1.65;
+            color: var(--text-secondary);
+        }
+
+        .diff-section-heading {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            margin-top: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px dashed var(--border-soft);
+            font-style: italic;
+        }
+
+        .diff-section-heading:first-child { margin-top: 0; }
+
+        .diff-add {
+            background: var(--diff-add);
+            color: #6ee7b7;
+            padding: 0.05rem 0.3rem;
+            border-radius: 3px;
+            border-left: 2px solid var(--success);
+            padding-left: 0.4rem;
+            margin-left: -0.4rem;
+            display: inline-block;
+        }
+
+        .diff-del {
+            background: var(--diff-del);
+            color: #fca5a5;
+            padding: 0.05rem 0.3rem;
+            border-radius: 3px;
+            text-decoration: line-through;
+            text-decoration-color: var(--danger);
+        }
+
+        .diff-mod {
+            background: var(--diff-mod);
+            color: #fcd34d;
+            padding: 0.05rem 0.3rem;
+            border-radius: 3px;
+        }
+
+        .meddra-term {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.7rem;
+            background: rgba(168, 85, 247, 0.18);
+            color: #d8b4fe;
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+        }
+
+        .signal-badge {
+            display: inline-block;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.6rem;
+            background: var(--primary);
+            color: white;
+            padding: 0.1rem 0.45rem;
+            border-radius: 10px;
+            margin-left: 0.3rem;
+            font-weight: 700;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .control-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: 'Sora', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .control-btn:hover {
+            border-color: var(--primary);
+            background: rgba(236, 72, 153, 0.1);
+        }
+
+        .control-btn.active {
+            border-color: var(--primary);
+            background: rgba(236, 72, 153, 0.2);
+            color: var(--primary);
+        }
+
+        .control-btn.primary {
+            background: var(--psur-gradient);
+            border-color: transparent;
+            color: white;
+        }
+
+        /* MedDRA Frequency Chart */
+        .meddra-chart-section {
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .meddra-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.45rem;
+        }
+
+        .meddra-name {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            min-width: 120px;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .meddra-bar-container {
+            flex: 1;
+            height: 16px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .meddra-bar-prev {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: rgba(168, 85, 247, 0.4);
+            transition: width 0.6s;
+        }
+
+        .meddra-bar-curr {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--psur-gradient);
+            border-radius: 4px;
+            transition: width 0.6s;
+        }
+
+        .meddra-delta {
+            font-size: 0.65rem;
+            font-weight: 700;
+            font-family: 'Fira Code', monospace;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .meddra-delta.up { color: var(--danger); }
+        .meddra-delta.down { color: var(--success); }
+        .meddra-delta.same { color: var(--text-muted); }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .model-info {
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .model-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .model-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--psur-gradient);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+
+        .model-name {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.15rem;
+            font-weight: 400;
+        }
+
+        .model-version {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .model-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+
+        .model-stat {
+            background: var(--bg-dark);
+            border-radius: 8px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .model-stat-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: 'Fira Code', monospace;
+            color: var(--primary);
+        }
+
+        .model-stat-label {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Signal Alerts */
+        .signal-list {
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .signal-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.7rem 0.8rem;
+            background: var(--bg-elevated);
+            border-radius: 10px;
+            margin-bottom: 0.4rem;
+            border-left: 3px solid var(--primary);
+            transition: all 0.3s;
+        }
+
+        .signal-item.high { border-left-color: var(--danger); background: rgba(239, 68, 68, 0.06); }
+        .signal-item.medium { border-left-color: var(--warning); }
+        .signal-item.low { border-left-color: var(--info); }
+
+        .signal-icon {
+            width: 30px;
+            height: 30px;
+            background: rgba(236, 72, 153, 0.18);
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .signal-item.high .signal-icon { background: rgba(239, 68, 68, 0.18); }
+        .signal-item.medium .signal-icon { background: rgba(245, 158, 11, 0.18); }
+        .signal-item.low .signal-icon { background: rgba(139, 92, 246, 0.18); }
+
+        .signal-content { flex: 1; min-width: 0; }
+
+        .signal-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+            color: var(--text-primary);
+        }
+
+        .signal-meta {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .signal-severity {
+            font-size: 0.65rem;
+            font-weight: 700;
+            font-family: 'Fira Code', monospace;
+            color: var(--danger);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .signal-item.medium .signal-severity { color: var(--warning); }
+        .signal-item.low .signal-severity { color: var(--info); }
+
+        /* Activity Log */
+        .activity-log {
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.6rem 0.75rem;
+            background: var(--bg-elevated);
+            border-radius: 9px;
+            margin-bottom: 0.4rem;
+            border-left: 3px solid var(--primary);
+            animation: slideIn 0.3s ease;
+        }
+
+        .log-item.add { border-left-color: var(--success); }
+        .log-item.signal { border-left-color: var(--danger); }
+        .log-item.mod { border-left-color: var(--warning); }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .log-icon {
+            width: 28px;
+            height: 28px;
+            background: rgba(236, 72, 153, 0.18);
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .log-item.add .log-icon { background: rgba(16, 185, 129, 0.18); }
+        .log-item.signal .log-icon { background: rgba(239, 68, 68, 0.18); }
+        .log-item.mod .log-icon { background: rgba(245, 158, 11, 0.18); }
+
+        .log-content { flex: 1; min-width: 0; }
+        .log-title { font-size: 0.74rem; font-weight: 600; margin-bottom: 0.1rem; }
+        .log-meta { font-size: 0.6rem; color: var(--text-muted); font-family: 'Fira Code', monospace; }
+
+        /* Processing Overlay */
+        .processing-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 5, 24, 0.97);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .processing-overlay.active { display: flex; }
+
+        .diff-animation {
+            position: relative;
+            width: 200px;
+            height: 120px;
+            margin-bottom: 2rem;
+        }
+
+        .anim-page {
+            position: absolute;
+            width: 80px;
+            height: 110px;
+            background: var(--bg-elevated);
+            border: 2px solid var(--primary);
+            border-radius: 6px;
+            top: 5px;
+            box-shadow: 0 5px 25px rgba(236, 72, 153, 0.3);
+        }
+
+        .anim-page::before, .anim-page::after, .anim-page span {
+            content: '';
+            position: absolute;
+            background: var(--primary);
+            opacity: 0.4;
+            height: 2px;
+            left: 12%;
+            right: 12%;
+        }
+        .anim-page::before { top: 20%; }
+        .anim-page::after { top: 35%; }
+
+        .anim-page-left {
+            left: 5px;
+            animation: pageLeft 2.5s ease-in-out infinite;
+        }
+
+        .anim-page-right {
+            right: 5px;
+            animation: pageRight 2.5s ease-in-out infinite;
+            border-color: var(--secondary);
+            box-shadow: 0 5px 25px rgba(168, 85, 247, 0.3);
+        }
+
+        .anim-page-right::before, .anim-page-right::after {
+            background: var(--secondary);
+        }
+
+        @keyframes pageLeft {
+            0%, 100% { transform: translateX(0) rotate(-3deg); }
+            50% { transform: translateX(-8px) rotate(-6deg); }
+        }
+
+        @keyframes pageRight {
+            0%, 100% { transform: translateX(0) rotate(3deg); }
+            50% { transform: translateX(8px) rotate(6deg); }
+        }
+
+        .anim-diff-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Fira Code', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            animation: deltaPulse 1.5s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        @keyframes deltaPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.6; }
+        }
+
+        .processing-text {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.4rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+            font-style: italic;
+        }
+
+        .processing-stage {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .processing-progress {
+            width: 300px;
+            height: 5px;
+            background: var(--bg-elevated);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .processing-bar {
+            height: 100%;
+            background: var(--psur-gradient);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            padding: 0.85rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.6);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+        }
+
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast-icon { font-size: 1.3rem; }
+        .toast-title { font-size: 0.85rem; font-weight: 600; }
+        .toast-message { font-size: 0.7rem; color: var(--text-muted); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🩺</div>
+                <div>
+                    <div class="logo-text">PSUR-DeltaTracker</div>
+                    <div class="logo-subtitle">Biolevate · Post-Market Pharmacovigilance</div>
+                </div>
+            </div>
+            <div class="header-badges">
+                <span class="badge live">● Monitoring</span>
+                <span class="badge">ICH E2C(R2)</span>
+                <span class="badge">MedDRA v27.0</span>
+                <span class="badge">Signal Detection</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="hero">
+            <h1>Periodic Safety Updates, <span class="italic">automated</span></h1>
+            <p>Auto-compare PSUR versions, identify new ICSRs and emerging safety signals, generate the updated section</p>
+        </div>
+
+        <div class="workspace">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📑 PSUR Version Comparison</h3>
+                    <span style="font-size: 0.7rem; color: var(--text-muted); font-family: 'Fira Code';">Product: BVL-2188 · DLP: 31-Mar-2026</span>
+                </div>
+                <div class="card-body">
+                    <div class="stats-bar">
+                        <div class="stat-card">
+                            <div class="stat-value primary" id="newICSRs">0</div>
+                            <div class="stat-label">New ICSRs</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value secondary" id="sectionsUpdated">0</div>
+                            <div class="stat-label">Sections Updated</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value danger" id="signalsDetected">0</div>
+                            <div class="stat-label">Safety Signals</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value warning" id="changeRate">0%</div>
+                            <div class="stat-label">Section Change %</div>
+                        </div>
+                    </div>
+
+                    <div class="diff-viewer">
+                        <div class="diff-pane previous">
+                            <div class="diff-pane-header">
+                                <span class="diff-pane-title">Previous PSUR</span>
+                                <span class="diff-pane-version">v4 · DLP 31-Sep-2025</span>
+                            </div>
+                            <div class="diff-content" id="diffPrev">
+                                <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 5rem 1rem;">
+                                    Click "Compare Versions" to analyze PSUR delta
+                                </div>
+                            </div>
+                        </div>
+                        <div class="diff-pane current">
+                            <div class="diff-pane-header">
+                                <span class="diff-pane-title">Updated PSUR (draft)</span>
+                                <span class="diff-pane-version">v5 · DLP 31-Mar-2026</span>
+                            </div>
+                            <div class="diff-content" id="diffCurr">
+                                <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 5rem 1rem;">
+                                    Updated version will populate here
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="controls">
+                        <button class="control-btn primary" id="startBtn" onclick="toggleCompare()">
+                            <span id="startIcon">▶</span>
+                            <span id="startText">Compare Versions</span>
+                        </button>
+                        <button class="control-btn" onclick="resetCompare()">
+                            🔄 Reset
+                        </button>
+                        <button class="control-btn" onclick="exportPSUR()">
+                            📤 Export PSUR
+                        </button>
+                        <button class="control-btn" onclick="flagSignal()">
+                            🚨 Flag Signal
+                        </button>
+                    </div>
+
+                    <div class="meddra-chart-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <span style="font-size: 0.8rem; font-weight: 600;">📊 MedDRA Term Frequency Δ</span>
+                            <span style="font-size: 0.6rem; color: var(--text-muted); font-family: 'Fira Code', monospace;">
+                                <span style="color: rgba(168, 85, 247, 0.6);">■</span> Previous
+                                <span style="color: var(--primary); margin-left: 0.5rem;">■</span> Current
+                            </span>
+                        </div>
+                        <div id="meddraChart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🧠 Diff Engine</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="model-info">
+                            <div class="model-header">
+                                <div class="model-icon">🩺</div>
+                                <div>
+                                    <div class="model-name">DeltaTracker</div>
+                                    <div class="model-version">v2.8.0 · Semantic Diff + MedDRA</div>
+                                </div>
+                            </div>
+                            <div class="model-stats">
+                                <div class="model-stat">
+                                    <div class="model-stat-value" id="latency">—</div>
+                                    <div class="model-stat-label">Section (s)</div>
+                                </div>
+                                <div class="model-stat">
+                                    <div class="model-stat-value">98.2%</div>
+                                    <div class="model-stat-label">MedDRA Recall</div>
+                                </div>
+                                <div class="model-stat">
+                                    <div class="model-stat-value">27.0</div>
+                                    <div class="model-stat-label">MedDRA Version</div>
+                                </div>
+                                <div class="model-stat">
+                                    <div class="model-stat-value">17.4k</div>
+                                    <div class="model-stat-label">PTs Indexed</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🚨 Safety Signals</h3>
+                        <span style="font-size: 0.65rem; color: var(--text-muted);" id="signalCount">0 signals</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="signal-list" id="signalList">
+                            <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1.5rem;">
+                                Start comparison to detect signals
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📋 Change Log</h3>
+                        <span style="font-size: 0.65rem; color: var(--text-muted);" id="logCount">0 events</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="activity-log" id="activityLog">
+                            <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1.5rem;">
+                                Start comparison to see changes
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="processing-overlay" id="processingOverlay">
+        <div class="diff-animation">
+            <div class="anim-page anim-page-left"></div>
+            <div class="anim-page anim-page-right"></div>
+            <div class="anim-diff-line">Δ</div>
+        </div>
+        <div class="processing-text">Computing PSUR Delta</div>
+        <div class="processing-stage" id="processingStage">Loading previous PSUR...</div>
+        <div class="processing-progress">
+            <div class="processing-bar" id="processingBar"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <span class="toast-icon">✅</span>
+        <div class="toast-content">
+            <div class="toast-title" id="toastTitle">Success</div>
+            <div class="toast-message" id="toastMessage">Comparison started</div>
+        </div>
+    </div>
+
+    <script>
+        // PSUR section pairs (previous vs current)
+        const psurSections = [
+            {
+                heading: 'Section 6.3 — Cumulative Exposure',
+                prev: `Cumulative post-marketing exposure since launch is estimated at <strong>847,000 patient-years</strong>. Distribution by region: EU (42%), US (38%), Asia-Pacific (14%), ROW (6%). No changes in exposure trends from prior reporting interval.`,
+                curr: `Cumulative post-marketing exposure since launch is estimated at <span class="diff-mod">1,124,000 patient-years</span>. Distribution by region: EU (40%), US (37%), Asia-Pacific (16%), ROW (7%). <span class="diff-add">Expansion in Japan post-PMDA approval (Q4 2025) accounts for the majority of new exposure (+277,000 patient-years).</span>`,
+                logs: [
+                    { type: 'mod', title: 'Cumulative exposure updated', meta: '+277,000 patient-years (+33%)' }
+                ]
+            },
+            {
+                heading: 'Section 8.2 — Adverse Reactions',
+                prev: `Most frequently reported adverse reactions (≥1%): <span class="meddra-term">Headache</span> (3.2%), <span class="meddra-term">Nasopharyngitis</span> (2.8%), <span class="meddra-term">Injection-site reaction</span> (2.1%), <span class="meddra-term">Nausea</span> (1.7%).`,
+                curr: `Most frequently reported adverse reactions (≥1%): <span class="meddra-term">Headache</span> (3.4%), <span class="meddra-term">Nasopharyngitis</span> (2.9%), <span class="meddra-term">Injection-site reaction</span> <span class="diff-mod">(2.6%)</span>, <span class="meddra-term">Nausea</span> <span class="diff-mod">(2.3%)</span>. <span class="diff-add">New entry: <span class="meddra-term">Pruritus generalised</span> (1.2%) — newly meets ≥1% threshold.</span>`,
+                logs: [
+                    { type: 'add', title: 'New ADR ≥1%: Pruritus generalised', meta: 'MedDRA PT · 10037087' },
+                    { type: 'mod', title: 'Injection-site reaction frequency +23%', meta: '2.1% → 2.6%' }
+                ]
+            },
+            {
+                heading: 'Section 9.1 — New ICSRs',
+                prev: `Total cumulative ICSRs: <strong>2,481</strong>. During the previous reporting interval, 312 new ICSRs were received; of these, 18 were serious and unlisted. All were assessed and reported per ICH E2C(R2) timelines.`,
+                curr: `Total cumulative ICSRs: <span class="diff-mod">3,002</span>. <span class="diff-add">During the current reporting interval, 521 new ICSRs were received; of these, 31 were serious and unlisted, and 4 met criteria for expedited reporting.</span> All cases assessed per ICH E2C(R2). <span class="diff-add">No fatal cases attributable to BVL-2188 in this interval.</span>`,
+                logs: [
+                    { type: 'add', title: '521 new ICSRs ingested', meta: '+67% vs prior interval' },
+                    { type: 'signal', title: '4 cases require expedited reporting', meta: 'Day-7/Day-15 timeline triggered' }
+                ]
+            },
+            {
+                heading: 'Section 12 — Signal Evaluation',
+                prev: `No new safety signals identified during the reporting interval. Ongoing monitoring of <span class="meddra-term">hepatic enzyme elevation</span> remains within expected background rate.`,
+                curr: `<span class="diff-add">Two new safety signals identified during the reporting interval:</span><br><br>
+                    <span class="diff-add">• <strong><span class="meddra-term">Hepatic enzyme elevation</span></strong> <span class="signal-badge">SIGNAL</span> — ROR 2.4 (95% CI: 1.8-3.2), now exceeds background rate. Recommended action: Update Section 4.4 of SmPC with monitoring guidance.</span><br><br>
+                    <span class="diff-add">• <strong><span class="meddra-term">Pruritus generalised</span></strong> <span class="signal-badge">SIGNAL</span> — Disproportionality observed in disproportionality analysis (EBGM 3.1). Under investigation.</span>`,
+                logs: [
+                    { type: 'signal', title: 'NEW SIGNAL: Hepatic enzyme elevation', meta: 'ROR 2.4 · 95% CI: 1.8-3.2', severity: 'high' },
+                    { type: 'signal', title: 'NEW SIGNAL: Pruritus generalised', meta: 'EBGM 3.1 · under investigation', severity: 'medium' }
+                ]
+            },
+            {
+                heading: 'Section 13 — Risk-Benefit',
+                prev: `The overall benefit-risk balance for BVL-2188 in the approved indication of moderate-to-severe atopic dermatitis remains <strong>favourable</strong>. No new findings warrant changes to the current risk management activities.`,
+                curr: `The overall benefit-risk balance for BVL-2188 in the approved indication of moderate-to-severe atopic dermatitis remains <strong>favourable</strong>. <span class="diff-add">However, the newly identified signals for hepatic enzyme elevation and pruritus generalised warrant proactive risk-minimisation: (i) SmPC update with hepatic monitoring recommendation; (ii) targeted HCP communication; (iii) inclusion in the next RMP update.</span>`,
+                logs: [
+                    { type: 'mod', title: 'Risk-benefit conclusion updated', meta: 'RMP update + SmPC change recommended' }
+                ]
+            }
+        ];
+
+        const signals = [
+            { icon: '🩸', title: 'Hepatic enzyme elevation', meta: 'ROR 2.4 · 24 reports · 7 countries', severity: 'high', label: 'High' },
+            { icon: '🌡️', title: 'Pruritus generalised', meta: 'EBGM 3.1 · disproportionality flag', severity: 'medium', label: 'Medium' },
+            { icon: '💓', title: 'Palpitations (under review)', meta: 'PRR 1.8 · monitoring continues', severity: 'low', label: 'Low' }
+        ];
+
+        const meddraTerms = [
+            { name: 'Headache', prev: 32, curr: 34, max: 50 },
+            { name: 'Nasopharyngitis', prev: 28, curr: 29, max: 50 },
+            { name: 'Inj-site reaction', prev: 21, curr: 26, max: 50 },
+            { name: 'Nausea', prev: 17, curr: 23, max: 50 },
+            { name: 'Pruritus general.', prev: 4, curr: 12, max: 50 },
+            { name: 'Hepatic enzyme ↑', prev: 2, curr: 8, max: 50 },
+            { name: 'Fatigue', prev: 14, curr: 13, max: 50 }
+        ];
+
+        let isComparing = false;
+        let compareIndex = 0;
+        let newICSRs = 0;
+        let sectionsUpdated = 0;
+        let signalsDetected = 0;
+        let logEntries = [];
+
+        function init() {
+            renderMedDRAChart(true); // initial render with zero current
+        }
+
+        function renderMedDRAChart(initial = false) {
+            const chart = document.getElementById('meddraChart');
+            chart.innerHTML = meddraTerms.map(t => {
+                const prevPct = (t.prev / t.max) * 100;
+                const currPct = initial ? 0 : (t.curr / t.max) * 100;
+                const delta = t.curr - t.prev;
+                const deltaClass = delta > 0 ? 'up' : (delta < 0 ? 'down' : 'same');
+                const deltaSign = delta > 0 ? '+' : '';
+                return `
+                    <div class="meddra-row">
+                        <span class="meddra-name">${t.name}</span>
+                        <div class="meddra-bar-container">
+                            <div class="meddra-bar-prev" style="width: ${prevPct}%;"></div>
+                            <div class="meddra-bar-curr" style="width: ${currPct}%;"></div>
+                        </div>
+                        <span class="meddra-delta ${deltaClass}">${initial ? '—' : deltaSign + delta}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleCompare() {
+            if (!isComparing) startCompare();
+            else stopCompare();
+        }
+
+        function startCompare() {
+            const overlay = document.getElementById('processingOverlay');
+            const bar = document.getElementById('processingBar');
+            const stage = document.getElementById('processingStage');
+            overlay.classList.add('active');
+
+            const stages = [
+                'Loading previous PSUR (v4)...',
+                'Loading updated PSUR (v5)...',
+                'Parsing ICSRs from EudraVigilance...',
+                'Mapping MedDRA terms (v27.0)...',
+                'Computing semantic diff...',
+                'Running disproportionality analysis...',
+                'Generating delta report...'
+            ];
+
+            let progress = 0;
+            let stageIndex = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 14 + 8;
+                if (progress > 100) progress = 100;
+                bar.style.width = progress + '%';
+                const newStage = Math.floor((progress / 100) * stages.length);
+                if (newStage !== stageIndex && newStage < stages.length) {
+                    stageIndex = newStage;
+                    stage.textContent = stages[stageIndex];
+                }
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        overlay.classList.remove('active');
+                        beginComparison();
+                    }, 300);
+                }
+            }, 90);
+        }
+
+        function beginComparison() {
+            isComparing = true;
+            document.getElementById('startIcon').textContent = '⏸';
+            document.getElementById('startText').textContent = 'Pause Comparison';
+            document.getElementById('startBtn').classList.add('active');
+
+            document.getElementById('diffPrev').innerHTML = '';
+            document.getElementById('diffCurr').innerHTML = '';
+            document.getElementById('signalList').innerHTML = '';
+            document.getElementById('activityLog').innerHTML = '';
+
+            compareIndex = 0;
+            stepComparison();
+        }
+
+        function stepComparison() {
+            if (!isComparing) return;
+            if (compareIndex >= psurSections.length) {
+                // Done - animate the meddra chart current values
+                renderMedDRAChart(false);
+                // Reveal signals
+                revealSignals();
+                stopCompare();
+                showToast('✓ Delta Computed', 'PSUR v5 draft ready for QPPV review');
+                return;
+            }
+
+            const section = psurSections[compareIndex];
+
+            // Add to previous pane
+            const prev = document.getElementById('diffPrev');
+            const prevDiv = document.createElement('div');
+            prevDiv.style.animation = 'slideIn 0.4s ease';
+            prevDiv.innerHTML = `
+                <div class="diff-section-heading">${section.heading}</div>
+                <div>${section.prev}</div>
+            `;
+            prev.appendChild(prevDiv);
+            prev.scrollTop = prev.scrollHeight;
+
+            // Add to current pane (with a small delay for visual flow)
+            setTimeout(() => {
+                const curr = document.getElementById('diffCurr');
+                const currDiv = document.createElement('div');
+                currDiv.style.animation = 'slideIn 0.4s ease';
+                currDiv.innerHTML = `
+                    <div class="diff-section-heading">${section.heading}</div>
+                    <div>${section.curr}</div>
+                `;
+                curr.appendChild(currDiv);
+                curr.scrollTop = curr.scrollHeight;
+
+                // Add logs for this section
+                section.logs.forEach(log => {
+                    addLog(log.type, log.title, log.meta);
+                    if (log.type === 'signal') signalsDetected++;
+                    if (log.type === 'add') newICSRs += Math.floor(Math.random() * 150) + 80;
+                });
+                sectionsUpdated++;
+                updateStats();
+
+                document.getElementById('latency').textContent = (0.8 + Math.random() * 0.6).toFixed(1);
+
+                compareIndex++;
+                setTimeout(stepComparison, 1400);
+            }, 500);
+        }
+
+        function revealSignals() {
+            const list = document.getElementById('signalList');
+            list.innerHTML = '';
+            signals.forEach((s, idx) => {
+                setTimeout(() => {
+                    const div = document.createElement('div');
+                    div.className = `signal-item ${s.severity}`;
+                    div.style.animation = 'slideIn 0.4s ease';
+                    div.innerHTML = `
+                        <div class="signal-icon">${s.icon}</div>
+                        <div class="signal-content">
+                            <div class="signal-title">${s.title}</div>
+                            <div class="signal-meta">${s.meta}</div>
+                        </div>
+                        <div class="signal-severity">${s.label}</div>
+                    `;
+                    list.appendChild(div);
+                    document.getElementById('signalCount').textContent = `${idx + 1} signals`;
+                }, idx * 300);
+            });
+        }
+
+        function addLog(type, title, meta) {
+            const log = document.getElementById('activityLog');
+            const icons = { add: '➕', signal: '🚨', mod: '✎' };
+            const entry = document.createElement('div');
+            entry.className = `log-item ${type}`;
+            entry.innerHTML = `
+                <div class="log-icon">${icons[type] || '·'}</div>
+                <div class="log-content">
+                    <div class="log-title">${title}</div>
+                    <div class="log-meta">${meta}</div>
+                </div>
+            `;
+            if (log.firstChild && log.firstChild.style && log.firstChild.style.textAlign) {
+                log.innerHTML = '';
+            }
+            log.insertBefore(entry, log.firstChild);
+            logEntries.unshift(entry);
+            if (logEntries.length > 30) logEntries.pop().remove();
+            document.getElementById('logCount').textContent = `${logEntries.length} events`;
+        }
+
+        function updateStats() {
+            document.getElementById('newICSRs').textContent = newICSRs;
+            document.getElementById('sectionsUpdated').textContent = sectionsUpdated;
+            document.getElementById('signalsDetected').textContent = signalsDetected;
+            const changePct = Math.floor((sectionsUpdated / psurSections.length) * 100);
+            document.getElementById('changeRate').textContent = changePct + '%';
+        }
+
+        function stopCompare() {
+            isComparing = false;
+            document.getElementById('startIcon').textContent = '▶';
+            document.getElementById('startText').textContent = 'Resume Comparison';
+            document.getElementById('startBtn').classList.remove('active');
+        }
+
+        function resetCompare() {
+            stopCompare();
+            compareIndex = 0;
+            newICSRs = 0;
+            sectionsUpdated = 0;
+            signalsDetected = 0;
+            logEntries = [];
+
+            document.getElementById('newICSRs').textContent = '0';
+            document.getElementById('sectionsUpdated').textContent = '0';
+            document.getElementById('signalsDetected').textContent = '0';
+            document.getElementById('changeRate').textContent = '0%';
+            document.getElementById('latency').textContent = '—';
+
+            document.getElementById('diffPrev').innerHTML = `
+                <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 5rem 1rem;">
+                    Click "Compare Versions" to analyze PSUR delta
+                </div>
+            `;
+            document.getElementById('diffCurr').innerHTML = `
+                <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 5rem 1rem;">
+                    Updated version will populate here
+                </div>
+            `;
+            document.getElementById('signalList').innerHTML = `
+                <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1.5rem;">
+                    Start comparison to detect signals
+                </div>
+            `;
+            document.getElementById('signalCount').textContent = '0 signals';
+            document.getElementById('activityLog').innerHTML = `
+                <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1.5rem;">
+                    Start comparison to see changes
+                </div>
+            `;
+            document.getElementById('logCount').textContent = '0 events';
+            renderMedDRAChart(true);
+            showToast('🔄 Reset Complete', 'Workspace cleared');
+        }
+
+        function exportPSUR() {
+            showToast('📤 PSUR Export Started', `${sectionsUpdated} sections · Word + XML EVPRM`);
+        }
+
+        function flagSignal() {
+            showToast('🚨 Signal Flagged', 'Routed to QPPV for medical review');
+        }
+
+        function showToast(title, message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
